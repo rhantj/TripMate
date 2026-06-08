@@ -1,0 +1,27 @@
+/* TripMate AI 회원가입 전용 스타일시트 */
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* 데이터 로딩 또는 이미지 대기를 위한 Shimmer 스켈레톤 애니메이션 */
+.shimmer {
+  background: linear-gradient(90deg, #f1f3f5 25%, #e1e3e4 50%, #f1f3f5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 회원가입 카드 컴포넌트의 은은한 섀도우 및 호버 애니메이션 */
+.auth-card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease;
+}

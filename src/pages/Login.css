@@ -1,0 +1,15 @@
+/* TripMate AI 로그인 전용 스타일시트 */
+
+body {
+  background-color: #f8f9fa;
+  -webkit-font-smoothing: antialiased;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* 로그인 카드 컴포넌트의 은은한 섀도우 설정 */
+.login-card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
