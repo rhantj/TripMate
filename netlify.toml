@@ -6,9 +6,15 @@
   command = "npm run build"
   publish = "dist"
 
-# SPA 라우팅 지원 - 모든 경로를 index.html로 리다이렉트
+# 루트(/) → 랜딩 페이지
 [[redirects]]
-  from = "/*"
+  from = "/"
+  to = "/public/landing.html"
+  status = 200
+
+# React 앱 SPA 라우팅
+[[redirects]]
+  from = "/app/*"
   to = "/index.html"
   status = 200
 
