@@ -1,0 +1,30 @@
+# ===== Netlify 배포 설정 =====
+# 현재: 정적 HTML 임시 페이지 배포
+# 추후: React + Vite 빌드 배포로 전환 예정
+
+[build]
+  # 빌드 명령어 (현재는 정적 파일이므로 비워둠)
+  command = "echo 'Static site - no build needed'"
+  # 배포할 디렉토리 (루트 기준)
+  publish = "."
+
+# SPA 라우팅 지원 - 모든 경로를 index.html로 리다이렉트
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 보안 헤더 설정
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# 캐시 설정 - HTML은 항상 최신 버전
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
