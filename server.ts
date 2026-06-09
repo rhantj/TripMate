@@ -4,6 +4,7 @@
  */
 
 import express from "express";
+import { createServer } from "http";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
@@ -13,7 +14,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
@@ -55,7 +56,7 @@ function writePlans(plans: any[]) {
 let ai: GoogleGenAI | null = null;
 const apiKey = process.env.GEMINI_API_KEY;
 
-if (apiKey && apiKey !== "MY_GEMINI_API_KEY" && apiKey.trim() !== "") {
+if (apiKey && apiKey !== "" && apiKey.trim() !== "") {
   try {
     ai = new GoogleGenAI({
       apiKey: apiKey,
@@ -76,7 +77,7 @@ if (apiKey && apiKey !== "MY_GEMINI_API_KEY" && apiKey.trim() !== "") {
 // Helper to choose corresponding high-quality mockup images for places
 function getMockupImage(category: string, destination: string, index: number): string {
   const normalizedDest = (destination || "").toLowerCase();
-  
+
   if (normalizedDest.includes("도쿄") || normalizedDest.includes("tokyo")) {
     const tokyoImages = [
       "https://lh3.googleusercontent.com/aida-public/AB6AXuAWwaT6yvcSZZqChzslpAIM-mXP8HAwO9RMpNMpU7_5xZGThTemplate_Tokyo1",
@@ -122,7 +123,7 @@ function getMockupImage(category: string, destination: string, index: number): s
   } else if (category === "숙소") {
     return "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500&auto=format&fit=crop";
   }
-  
+
   return "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=500&auto=format&fit=crop";
 }
 
@@ -150,12 +151,12 @@ app.post("/api/plans", (express.json() as any), (req, res) => {
   }
 
   const allPlans = readPlans();
-  
+
   // Assign simple UUID if not provided
   if (!plan.id) {
     plan.id = `plan-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
-  
+
   const nowStr = new Date().toISOString();
   plan.createdAt = plan.createdAt || nowStr;
   plan.updatedAt = nowStr;
@@ -185,10 +186,10 @@ app.post("/api/plans", (express.json() as any), (req, res) => {
 app.put("/api/plans/:id", (req, res) => {
   const { id } = req.params;
   const updatedPlan = req.body;
-  
+
   const allPlans = readPlans();
   const index = allPlans.findIndex((p) => p.id === id);
-  
+
   if (index === -1) {
     return res.status(404).json({ error: "Plan not found" });
   }
@@ -208,7 +209,7 @@ app.delete("/api/plans/:id", (req, res) => {
   const { id } = req.params;
   const allPlans = readPlans();
   const filtered = allPlans.filter((p) => p.id !== id);
-  
+
   if (allPlans.length === filtered.length) {
     return res.status(404).json({ error: "Plan not found" });
   }
@@ -248,7 +249,7 @@ app.post("/api/generate-plan", async (req, res) => {
   const createFallbackPlan = () => {
     const dCount = startDate && endDate ? Math.ceil(Math.abs(new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1 : 3;
     const fallbackDays = [];
-    
+
     for (let d = 1; d <= dCount; d++) {
       fallbackDays.push({
         day: d,
@@ -420,9 +421,14 @@ app.post("/api/generate-plan", async (req, res) => {
 // Vite Dev Server / Static Production Asset Serving
 // -------------------------------------------------------------
 async function startServer() {
+  const server = createServer(app);
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { server },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -434,8 +440,19 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[TripMate AI] Server running at http://0.0.0.0:${PORT}`);
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `[TripMate AI] Port ${PORT} is already in use. Stop the other process or run with PORT=<number> npm run dev`,
+      );
+      process.exit(1);
+    }
+
+    throw err;
+  });
+
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`[TripMate AI] Server running at http://localhost:${PORT}`);
   });
 }
 
