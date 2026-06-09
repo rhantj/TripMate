@@ -1,6 +1,4 @@
-# ===== Netlify 배포 설정 =====
-# 현재: 정적 HTML 임시 페이지 배포
-# 추후: React + Vite 빌드 배포로 전환 예정
+
 
 [build]
   command = "npm run build"
