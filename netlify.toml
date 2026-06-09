@@ -11,7 +11,7 @@
 # React 앱 SPA 라우팅
 [[redirects]]
   from = "/app/*"
-  to = "/index.html"
+  to = "/app.html"
   status = 200
 
 # 보안 헤더 설정
