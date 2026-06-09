@@ -27,7 +27,7 @@ function Login() {
 
     try {
       // Supabase 이메일/비밀번호 로그인 API 호출
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -37,7 +37,7 @@ function Login() {
       }
 
       alert('성공적으로 로그인되었습니다!');
-      // 로그인 성공 시 이후 메인 화면이나 대시보드로 이동이 가능하도록 구성
+      navigate('/');
     } catch (err) {
       console.error('로그인 에러:', err);
       // 에러 메시지 분석을 통해 구체적인 원인을 설명하고 정중하게 경고 표시
