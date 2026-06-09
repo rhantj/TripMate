@@ -13,8 +13,8 @@ export default defineConfig(() => {
     build: {
       rollupOptions: {
         input: {
-          app: path.resolve(__dirname, 'index.html'),        // React 앱
-          index: path.resolve(__dirname, 'landing.html'), // 랜딩 페이지
+          app: path.resolve(__dirname, 'index.html'),
+          landing: path.resolve(__dirname, 'landing.html'),
         },
       },
     },
