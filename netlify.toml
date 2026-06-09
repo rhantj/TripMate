@@ -7,7 +7,7 @@
 # 루트(/) → 랜딩 페이지
 [[redirects]]
   from = "/"
-  to = "/public/landing.html"
+  to = "/landing.html"
   status = 200
 
 # React 앱 SPA 라우팅
