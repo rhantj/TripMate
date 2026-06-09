@@ -14,7 +14,7 @@ export default defineConfig(() => {
       rollupOptions: {
         input: {
           app: path.resolve(__dirname, 'index.html'),        // React 앱
-          landing: path.resolve(__dirname, 'landing.html'), // 랜딩 페이지
+          index: path.resolve(__dirname, 'landing.html'), // 랜딩 페이지
         },
       },
     },
