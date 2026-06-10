@@ -73,17 +73,14 @@ export default function App() {
       }
     }
 
-    // Fallback to local server JSON storage
+    // Fallback to local browser localStorage storage
     try {
-      const res = await fetch(`/api/plans?userId=${currentSession.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSavedPlans(data);
-      } else {
-        throw new Error("Local DB error status");
-      }
+      const storedPlans = localStorage.getItem("tripmate_local_plans");
+      const allPlans = storedPlans ? JSON.parse(storedPlans) : [];
+      const userPlans = allPlans.filter((p: any) => p.userId === currentSession.id);
+      setSavedPlans(userPlans);
     } catch (err) {
-      console.error("Error reading saved plans on boot:", err);
+      console.error("Error reading saved plans from localStorage:", err);
     }
   };
 
@@ -191,22 +188,23 @@ export default function App() {
     }
 
     try {
-      const response = await fetch("/api/plans", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(completePlan),
-      });
-
-      if (!response.ok) {
-        throw new Error("Save request failed");
+      const storedPlans = localStorage.getItem("tripmate_local_plans");
+      const allPlans = storedPlans ? JSON.parse(storedPlans) : [];
+      
+      // Ensure unique ID if not generated
+      if (!completePlan.id) {
+        completePlan.id = `plan-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       }
 
-      const saved: TravelPlan = await response.json();
-      setSavedPlans([saved, ...savedPlans]);
+      // Add to array
+      allPlans.push(completePlan);
+      localStorage.setItem("tripmate_local_plans", JSON.stringify(allPlans));
+
+      setSavedPlans([completePlan, ...savedPlans]);
       alert("성공적으로 보관함(마이페이지)에 일정이 저장되었습니다!");
       setActiveTab("my_trips");
     } catch (err) {
-      console.error(err);
+      console.error("Error saving plan to localStorage:", err);
       alert("일정 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     }
   };
@@ -268,20 +266,20 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(`/api/plans/${plan.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedPlan),
-      });
-
-      if (!response.ok) {
-        throw new Error("Update request failed");
+      const storedPlans = localStorage.getItem("tripmate_local_plans");
+      const allPlans = storedPlans ? JSON.parse(storedPlans) : [];
+      
+      const index = allPlans.findIndex((p: any) => p.id === updatedPlan.id);
+      if (index !== -1) {
+        allPlans[index] = updatedPlan;
+      } else {
+        allPlans.push(updatedPlan);
       }
-
-      const updated: TravelPlan = await response.json();
-      setSavedPlans(savedPlans.map((p) => (p.id === updated.id ? updated : p)));
+      
+      localStorage.setItem("tripmate_local_plans", JSON.stringify(allPlans));
+      setSavedPlans(savedPlans.map((p) => (p.id === updatedPlan.id ? updatedPlan : p)));
     } catch (err) {
-      console.error(err);
+      console.error("Error updating plan in localStorage:", err);
       throw err;
     }
   };
@@ -324,13 +322,11 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(`/api/plans/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Delete request failed");
-      }
+      const storedPlans = localStorage.getItem("tripmate_local_plans");
+      const allPlans = storedPlans ? JSON.parse(storedPlans) : [];
+      
+      const filtered = allPlans.filter((p: any) => p.id !== id);
+      localStorage.setItem("tripmate_local_plans", JSON.stringify(filtered));
 
       setSavedPlans(savedPlans.filter((p) => p.id !== id));
       if (activePlan?.id === id) {
@@ -338,7 +334,7 @@ export default function App() {
         setActiveTab("my_trips");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error deleting plan from localStorage:", err);
       alert("일정을 삭제하는 중 문제가 발생했습니다.");
     }
   };

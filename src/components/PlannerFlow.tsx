@@ -74,27 +74,34 @@ export default function PlannerFlow({ onPlanGenerated }: PlannerFlowProps) {
   const handleGenerate = async () => {
     setLoading(true);
 
+    const requestPayload = {
+      destination,
+      startDate,
+      endDate,
+      companion,
+      budget,
+      styles,
+      mustVisitPlaces: mustVisitPlaces.join(", "),
+      comments
+    };
+
+    console.log("★ [TripMate AI] AI 일정 생성 요청 시작:", requestPayload);
+
     try {
       const response = await fetch("/api/generate-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          destination,
-          startDate,
-          endDate,
-          companion,
-          budget,
-          styles,
-          mustVisitPlaces: mustVisitPlaces.join(", "),
-          comments
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
+      console.log(`★ [TripMate AI] API 응답 수신 상태코드: ${response.status} (${response.statusText})`);
+
       if (!response.ok) {
-        throw new Error("API request failed");
+        throw new Error(`API request failed with status ${response.status}`);
       }
 
       const plan: TravelPlan = await response.json();
+      console.log("★ [TripMate AI] API 응답 파싱 성공. 생성된 일정 데이터:", plan);
       
       // Override default name if customized
       if (tripTitle.trim()) {
@@ -103,7 +110,7 @@ export default function PlannerFlow({ onPlanGenerated }: PlannerFlowProps) {
 
       onPlanGenerated(plan);
     } catch (err) {
-      console.error("AI Planner Flow Error:", err);
+      console.error("★ [TripMate AI] AI Planner Flow Error (일정 생성 중 실패):", err);
       // Fallback is also sent by server, so we are safe
     } finally {
       setLoading(false);
