@@ -10,6 +10,14 @@ export default defineConfig(() => {
     root: projectRoot,
     publicDir: 'static',
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        input: {
+          app: path.resolve(__dirname, 'index.html'),
+          index: path.resolve(__dirname, 'landing.html'),
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': projectRoot,
