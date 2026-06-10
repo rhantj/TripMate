@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TravelPlan, ItineraryDay, ItineraryActivity } from "../types";
 import { EditIcon, ShareIcon, BookmarkIcon, SaveIcon, InfoIcon, LightbulbIcon, PlusCircleIcon, TrashIcon, CheckIcon } from "./Icons";
 
@@ -14,6 +14,8 @@ interface PlanResultViewProps {
   onUpdatePlan?: (plan: TravelPlan) => void;
   onBackToMyPage?: () => void;
 }
+
+const geocodeCache: { [key: string]: [number, number] } = {};
 
 export default function PlanResultView({
   plan: initialPlan,
@@ -27,7 +29,196 @@ export default function PlanResultView({
   const [isEditing, setIsEditing] = useState(false);
   const [savingLoading, setSavingLoading] = useState(false);
 
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+
   const selectedDay = plan.planContent?.[selectedDayIdx] || plan.planContent?.[0];
+
+  // Leaflet 지도 초기화 및 마커 렌더링
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!L || !mapContainerRef.current) return;
+
+    let isMounted = true;
+
+    // 기존 지도 인스턴스가 있다면 제거 (메모리 누수 및 지도 중복 에러 방지)
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.remove();
+      } catch (e) {
+        console.warn("Error removing previous map instance:", e);
+      }
+      mapInstanceRef.current = null;
+    }
+
+    const activities = selectedDay?.activities || [];
+    if (activities.length === 0) return;
+
+    // 도시별 위경도 사전
+    const CITY_COORDS: { [key: string]: [number, number] } = {
+      대전: [36.3504, 127.3845],
+      서울: [37.5665, 126.9780],
+      제주: [33.4996, 126.5312],
+      도쿄: [35.6762, 139.6503],
+      tokyo: [35.6762, 139.6503],
+      오사카: [34.6937, 135.5023],
+      osaka: [34.6937, 135.5023],
+      파리: [48.8566, 2.3522],
+      paris: [48.8566, 2.3522],
+      시드니: [-33.8688, 151.2093],
+      sydney: [-33.8688, 151.2093],
+    };
+
+    // 목적지에 따른 중심좌표 획득
+    let centerLat = 37.5665;
+    let centerLng = 126.9780;
+    const dest = plan.destination || "";
+    for (const key in CITY_COORDS) {
+      if (dest.includes(key)) {
+        [centerLat, centerLng] = CITY_COORDS[key];
+        break;
+      }
+    }
+
+    const loadMapAndMarkers = async () => {
+      const latlngs: [number, number][] = [];
+
+      for (let idx = 0; idx < activities.length; idx++) {
+        const act = activities[idx];
+        let lat = act.latitude;
+        let lng = act.longitude;
+
+        // 좌표 정보가 부실하거나 유효하지 않은 경우 실시간 주소 지오코딩 조회
+        if (typeof lat !== "number" || typeof lng !== "number" || lat === 0 || lng === 0) {
+          const searchTitle = act.title;
+          const cacheKey = `${dest}_${searchTitle}`;
+
+          if (geocodeCache[cacheKey]) {
+            [lat, lng] = geocodeCache[cacheKey];
+          } else {
+            try {
+              // 로컬 프록시 API 호출하여 CORS와 429 에러 방어
+              const url = `/api/geocode?city=${encodeURIComponent(dest)}&query=${encodeURIComponent(searchTitle)}`;
+              const res = await fetch(url);
+              if (res.ok) {
+                const data = await res.json();
+                if (data && data.lat && data.lon) {
+                  lat = data.lat;
+                  lng = data.lon;
+                  geocodeCache[cacheKey] = [lat, lng];
+                }
+              }
+            } catch (err) {
+              console.error("Geocoding proxy fetch failed for:", searchTitle, err);
+            }
+          }
+        }
+
+        // 지오코딩 실패 또는 좌표 미존재 시 대략적인 fallback 오프셋 생성
+        if (typeof lat !== "number" || typeof lng !== "number" || lat === 0 || lng === 0) {
+          lat = centerLat + (idx * 0.005) - 0.01;
+          lng = centerLng + (idx * 0.005) - 0.01;
+        }
+
+        latlngs.push([lat, lng]);
+      }
+
+      if (!isMounted || !mapContainerRef.current) return;
+
+      try {
+        // 지도 객체 생성 (배경은 OpenStreetMap 이용)
+        const map = L.map(mapContainerRef.current, {
+          zoomControl: false,
+          attributionControl: false,
+        }).setView(latlngs[0] || [centerLat, centerLng], 13);
+
+        mapInstanceRef.current = map;
+
+        // 아름다운 Voyager 스타일 타일맵 레이어 적용 (CARTO CDN)
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+          maxZoom: 19,
+        }).addTo(map);
+
+        // 마커 추가
+        const markers: any[] = [];
+        activities.forEach((act, idx) => {
+          const coord = latlngs[idx];
+          const category = act.category || "관광";
+          const color = category === "맛집" ? "#ef4444" : category === "카페" ? "#f59e0b" : category === "쇼핑" ? "#10b981" : category === "숙소" ? "#8b5cf6" : "#3b82f6";
+          
+          const customIcon = L.divIcon({
+            html: `
+              <div style="
+                background-color: ${color};
+                color: white;
+                width: 26px;
+                height: 26px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 800;
+                font-size: 11px;
+                border: 2px solid white;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+                transition: all 0.2s ease;
+              " class="hover:scale-115">
+                ${idx + 1}
+              </div>
+            `,
+            className: "custom-leaflet-marker",
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
+          });
+
+          const marker = L.marker(coord, { icon: customIcon }).addTo(map);
+          
+          // 마커 클릭 시 팝업 노출
+          marker.bindPopup(`
+            <div style="font-family: sans-serif; padding: 2px; width: 130px;">
+              <h5 style="margin: 0 0 4px 0; font-size: 12px; font-weight: bold; color: #1e293b;">${idx + 1}. ${act.title}</h5>
+              <p style="margin: 0; font-size: 10px; color: #64748b;">${act.time} • ${category}</p>
+            </div>
+          `);
+
+          markers.push(marker);
+        });
+
+        // 마커들을 이어주는 폴리라인(동선선) 추가
+        if (latlngs.length > 1) {
+          L.polyline(latlngs, {
+            color: "#3b82f6",
+            weight: 3.5,
+            dashArray: "6, 6",
+            opacity: 0.85,
+            lineJoin: "round",
+          }).addTo(map);
+        }
+
+        // 마커들 전체가 한눈에 보이도록 지도 뷰 영역 맞추기
+        if (latlngs.length > 0) {
+          const group = new L.featureGroup(markers);
+          map.fitBounds(group.getBounds().pad(0.15));
+        }
+      } catch (err) {
+        console.error("Leaflet map initialization error:", err);
+      }
+    };
+
+    loadMapAndMarkers();
+
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          console.warn("Error on cleanup map instance:", e);
+        }
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [selectedDay, plan.destination]);
 
   const handleShare = () => {
     const textToCopy = `✈️ [TripMate AI] ${plan.destination} 여행 일정\n- 기간: ${plan.duration}\n- 날짜: ${plan.startDate} ~ ${plan.endDate}\n\n상세 일정은 트립메이트 AI에서 확인해 보세요!`;
@@ -196,19 +387,14 @@ export default function PlanResultView({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mt-2">
           {/* Left Column: Place visual insights */}
           <div className="md:col-span-4 space-y-6">
-            <div className="relative rounded-2xl overflow-hidden aspect-[4/3] shadow-md group">
-              <img
-                alt="map-placeholder"
-                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-700"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBaU69A5xqMnI0MlMgQp3Zj8c2NBTgkJSpaJSjRShbjd-01fKWeb_0c7dzX6gyvc__MEEXaGmeKnp34cOhrjA_IvrcMzr6_gjgKMqc2uTS7NvtTTUsbj8v65kDZfqGozEnG69PAqAAKiVRNUQ0wJVPw2M5TPitNHZcaVbGPxtRM0lgbdkBH6I_SHascBjsKzlo5n3bClrWI3ZWZfq-mY_9avC2lTQjT94gfxiKDm3JHW9OcSudOAq4WV78TTt3ex1jp4qUra3EIZZg"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center text-white">
+            <div className="relative rounded-2xl overflow-hidden aspect-[4/3] shadow-md group z-10">
+              <div ref={mapContainerRef} className="w-full h-full" style={{ minHeight: "220px" }} />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent p-3 pt-6 flex justify-between items-center text-white z-[1000] pointer-events-none">
                 <div className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm font-bold flex items-center justify-center text-white">
+                  <span className="material-symbols-outlined text-xs font-bold flex items-center justify-center text-white">
                     location_on
                   </span>
-                  <span className="font-label-md text-xs font-bold">{plan.destination} 시내</span>
+                  <span className="font-label-md text-[11px] font-bold">{plan.destination} 여정 동선</span>
                 </div>
                 <a
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -216,7 +402,7 @@ export default function PlanResultView({
                   )}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="bg-white/25 hover:bg-white/40 backdrop-blur-md px-3 py-1 rounded-full text-[11px] font-label-md text-white border-0 transition-all font-semibold select-none"
+                  className="bg-white/20 hover:bg-white/35 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-label-md text-white border-none transition-all font-bold select-none pointer-events-auto shadow-sm"
                 >
                   지도에서 검색
                 </a>

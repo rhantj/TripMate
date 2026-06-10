@@ -114,7 +114,7 @@ export default function ProfileView({
   };
 
   const handleCopySql = () => {
-    const sql = `-- ✈️ TripMate AI - 곽진아 설계 데이터베이스 스키마 ERD DDL
+    const sql = `-- ✈️ TripMate AI - 휴먼3팀 설계 데이터베이스 스키마 ERD DDL
 -- 1. 여행 일정 관리 테이블 (travel_plans)
 CREATE TABLE IF NOT EXISTS travel_plans (
   id VARCHAR(255) PRIMARY KEY,
@@ -212,7 +212,7 @@ CREATE POLICY "모든 사용자의 삭제 정책"
             마이페이지 설정
           </h2>
           <p className="text-xs text-outline font-semibold mt-1">
-            곽진아(내 여행/풀스택 담당) 설계 • 로컬 스토리지 및 클라우드 데이터베이스 제어 인터페이스
+            휴먼3팀 설계 • 로컬 스토리지 및 클라우드 데이터베이스 제어 인터페이스
           </p>
         </div>
 
@@ -264,7 +264,7 @@ CREATE POLICY "모든 사용자의 삭제 정책"
                   {session.name}
                 </h3>
                 <span className="inline-flex self-center sm:self-auto bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold px-2.5 py-0.5 rounded-full select-none">
-                  Level 4 • 프로 플래너 • 곽진아 팀
+                  Level 4 • 프로 플래너 • 휴먼3팀
                 </span>
               </div>
               <p className="text-xs text-on-surface-variant font-medium mt-1 select-all">{session.email}</p>
@@ -350,7 +350,7 @@ CREATE POLICY "모든 사용자의 삭제 정책"
       {activeSubTab === "erd" && (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl p-6 border border-outline-variant/35 shadow-sm">
-            <h3 className="text-base font-bold text-on-surface mb-2">곽진아의 관계형 데이터베이스 ERD 모델링</h3>
+            <h3 className="text-base font-bold text-on-surface mb-2">휴먼3팀의 관계형 데이터베이스 ERD 모델링</h3>
             <p className="text-xs text-on-surface-variant mb-6">
               서버 보관을 위해 구축된 최적화된 PostgreSQL 스키마 간의 다이어그램 정보입니다.
             </p>
@@ -457,7 +457,7 @@ CREATE POLICY "모든 사용자의 삭제 정책"
               </div>
 
               <pre className="bg-slate-950 text-emerald-400 text-[10px] sm:text-xs font-mono p-4 rounded-xl overflow-x-auto select-all h-48 border border-slate-800">
-                {`-- ✈️ TripMate AI - 곽진아 설계 데이터베이스 스키마 ERD DDL
+                {`-- ✈️ TripMate AI - 휴먼3팀 설계 데이터베이스 스키마 ERD DDL
 -- 1. 여행 일정 관리 테이블 (travel_plans)
 CREATE TABLE IF NOT EXISTS travel_plans (
   id VARCHAR(255) PRIMARY KEY,
