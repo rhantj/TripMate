@@ -13,6 +13,8 @@ export interface ItineraryActivity {
   imageUrl?: string;
   mustVisit?: boolean;
   tags?: string[];
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface ItineraryDay {
@@ -25,6 +27,7 @@ export interface ItineraryDay {
 export interface TravelPlan {
   id: string;
   userId: string;
+  userSeq?: number;
   title: string;
   destination: string;
   startDate: string;
@@ -44,4 +47,5 @@ export interface UserSession {
   email: string;
   name: string;
   avatarUrl?: string;
+  userSeq?: number;
 }

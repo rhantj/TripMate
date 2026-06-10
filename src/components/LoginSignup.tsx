@@ -6,6 +6,7 @@
 import React, { useState } from "react";
 import { UserSession } from "../types";
 import { ExploreIcon, MailIcon, LockIcon, PersonIcon, ArrowRightIcon } from "./Icons";
+import { getSupabaseClient } from "../lib/supabaseClient";
 
 interface LoginSignupProps {
   onLoginSuccess: (session: UserSession) => void;
@@ -13,74 +14,201 @@ interface LoginSignupProps {
 
 export default function LoginSignup({ onLoginSuccess }: LoginSignupProps) {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("3team@tripmate.ai");
+  const [password, setPassword] = useState("12345678");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (isLogin) {
-      if (!email.trim() || !password.trim()) {
-        setError("이메일과 비밀번호를 입력해주세요.");
-        return;
-      }
-      
-      // Mock successful login
-      const mockSession: UserSession = {
-        id: "user-123",
-        email: email,
-        name: email.split("@")[0] || "여행자",
-        avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBCJRKcrw8jYy6nRr-YP0mvfcdQCZGulGdyzi2gnMfUv5adXdsvwJ-c6la6y17w3AVwz4CqHMb-ZOdjLMlclo8dS8bpakpQFAZ9V3DJZOctvzYBXd1rQF045DpAAel7e2tvMbOyA_iREPNt2Z0KfV9wRfJI6LpNzyocB3j3Zr2VyvTf6bHPZCwVk1J5MmxTf3rT476oiTNPeJV9KJ5atyNQRlm2I2gVLZU8rTcbp9flnrLAClH3tub8DCtmZGU2Ef9nAUcyb-PfuaU"
-      };
-      
-      localStorage.setItem("tripmate_session", JSON.stringify(mockSession));
-      onLoginSuccess(mockSession);
-    } else {
-      if (!name.trim()) {
-        setError("성함을 입력해주세요.");
-        return;
-      }
-      if (!email.trim()) {
-        setError("이메일을 입력해주세요.");
-        return;
-      }
-      if (password.length < 8) {
-        setError("비밀번호는 8자 이상이어야 합니다.");
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError("비밀번호가 일치하지 않습니다.");
-        return;
-      }
-      if (!agreeTerms) {
-        setError("서비스 이용약관 및 개인정보 처리방침에 동의해주세요.");
-        return;
-      }
+    const client = getSupabaseClient();
 
-      // Mock successful signup
-      const mockSession: UserSession = {
-        id: "user-123",
-        email: email,
-        name: name,
-        avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBCJRKcrw8jYy6nRr-YP0mvfcdQCZGulGdyzi2gnMfUv5adXdsvwJ-c6la6y17w3AVwz4CqHMb-ZOdjLMlclo8dS8bpakpQFAZ9V3DJZOctvzYBXd1rQF045DpAAel7e2tvMbOyA_iREPNt2Z0KfV9wRfJI6LpNzyocB3j3Zr2VyvTf6bHPZCwVk1J5MmxTf3rT476oiTNPeJV9KJ5atyNQRlm2I2gVLZU8rTcbp9flnrLAClH3tub8DCtmZGU2Ef9nAUcyb-PfuaU"
-      };
+    // Supabase가 활성화되지 않은 경우 기존 Mock 모드로 동작합니다.
+    if (!client) {
+      console.warn("Supabase client is not active. Falling back to Mock authentication.");
+      if (isLogin) {
+        if (!email.trim() || !password.trim()) {
+          setError("이메일과 비밀번호를 입력해주세요.");
+          return;
+        }
+        const mockSession: UserSession = {
+          id: "user-123",
+          email: email,
+          name: email.split("@")[0] || "여행자",
+          userSeq: 1,
+          avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBCJRKcrw8jYy6nRr-YP0mvfcdQCZGulGdyzi2gnMfUv5adXdsvwJ-c6la6y17w3AVwz4CqHMb-ZOdjLMlclo8dS8bpakpQFAZ9V3DJZOctvzYBXd1rQF045DpAAel7e2tvMbOyA_iREPNt2Z0KfV9wRfJI6LpNzyocB3j3Zr2VyvTf6bHPZCwVk1J5MmxTf3rT476oiTNPeJV9KJ5atyNQRlm2I2gVLZU8rTcbp9flnrLAClH3tub8DCtmZGU2Ef9nAUcyb-PfuaU"
+        };
+        localStorage.setItem("tripmate_session", JSON.stringify(mockSession));
+        onLoginSuccess(mockSession);
+      } else {
+        if (!name.trim() || !email.trim() || password.length < 8) {
+          setError("입력 정보를 다시 확인해주세요.");
+          return;
+        }
+        const mockSession: UserSession = {
+          id: "user-123",
+          email: email,
+          name: name,
+          userSeq: 1,
+          avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBCJRKcrw8jYy6nRr-YP0mvfcdQCZGulGdyzi2gnMfUv5adXdsvwJ-c6la6y17w3AVwz4CqHMb-ZOdjLMlclo8dS8bpakpQFAZ9V3DJZOctvzYBXd1rQF045DpAAel7e2tvMbOyA_iREPNt2Z0KfV9wRfJI6LpNzyocB3j3Zr2VyvTf6bHPZCwVk1J5MmxTf3rT476oiTNPeJV9KJ5atyNQRlm2I2gVLZU8rTcbp9flnrLAClH3tub8DCtmZGU2Ef9nAUcyb-PfuaU"
+        };
+        localStorage.setItem("tripmate_session", JSON.stringify(mockSession));
+        onLoginSuccess(mockSession);
+      }
+      return;
+    }
 
-      localStorage.setItem("tripmate_session", JSON.stringify(mockSession));
-      onLoginSuccess(mockSession);
+    try {
+      if (isLogin) {
+        if (!email.trim() || !password.trim()) {
+          setError("이메일과 비밀번호를 입력해주세요.");
+          return;
+        }
+
+        // Supabase Auth 로그인 시도
+        const { data, error: authErr } = await client.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (authErr) throw authErr;
+
+        if (data?.user) {
+          // public.users 테이블에서 해당 유저의 user_seq 정보 조회
+          const { data: userRow, error: dbErr } = await client
+            .from("users")
+            .select("user_seq, name")
+            .eq("user_id", data.user.id)
+            .maybeSingle();
+
+          if (dbErr) {
+            console.error("DB User mapping fetch failed:", dbErr);
+          }
+
+          const sessionData: UserSession = {
+            id: data.user.id,
+            email: data.user.email || email,
+            name: userRow?.name || data.user.email?.split("@")[0] || "여행자",
+            userSeq: userRow?.user_seq ? Number(userRow.user_seq) : 1,
+            avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBCJRKcrw8jYy6nRr-YP0mvfcdQCZGulGdyzi2gnMfUv5adXdsvwJ-c6la6y17w3AVwz4CqHMb-ZOdjLMlclo8dS8bpakpQFAZ9V3DJZOctvzYBXd1rQF045DpAAel7e2tvMbOyA_iREPNt2Z0KfV9wRfJI6LpNzyocB3j3Zr2VyvTf6bHPZCwVk1J5MmxTf3rT476oiTNPeJV9KJ5atyNQRlm2I2gVLZU8rTcbp9flnrLAClH3tub8DCtmZGU2Ef9nAUcyb-PfuaU"
+          };
+
+          localStorage.setItem("tripmate_session", JSON.stringify(sessionData));
+          onLoginSuccess(sessionData);
+        }
+      } else {
+        if (!name.trim()) {
+          setError("성함을 입력해주세요.");
+          return;
+        }
+        if (!email.trim()) {
+          setError("이메일을 입력해주세요.");
+          return;
+        }
+        if (password.length < 8) {
+          setError("비밀번호는 8자 이상이어야 합니다.");
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError("비밀번호가 일치하지 않습니다.");
+          return;
+        }
+        if (!agreeTerms) {
+          setError("서비스 이용약관 및 개인정보 처리방침에 동의해주세요.");
+          return;
+        }
+
+        // Supabase Auth 회원가입 시도 (이름 정보 메타데이터 추가 전송)
+        const { data, error: authErr } = await client.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: name
+            }
+          }
+        });
+
+        if (authErr) throw authErr;
+
+        if (data?.user) {
+          // 1. public.profiles 테이블 업서트 (중복 충돌 우회 및 eamil 칼럼 오타 준수)
+          const { error: profileErr } = await client
+            .from("profiles")
+            .upsert({
+              id: data.user.id,
+              full_name: name,
+              eamil: email, // profiles 테이블 오타 칼럼명 적용
+              avatar_url: "https://lh3.googleusercontent.com/aida-public/AB6AXuBCJRKcrw8jYy6nRr-YP0mvfcdQCZGulGdyzi2gnMfUv5adXdsvwJ-c6la6y17w3AVwz4CqHMb-ZOdjLMlclo8dS8bpakpQFAZ9V3DJZOctvzYBXd1rQF045DpAAel7e2tvMbOyA_iREPNt2Z0KfV9wRfJI6LpNzyocB3j3Zr2VyvTf6bHPZCwVk1J5MmxTf3rT476oiTNPeJV9KJ5atyNQRlm2I2gVLZU8rTcbp9flnrLAClH3tub8DCtmZGU2Ef9nAUcyb-PfuaU"
+            });
+
+          if (profileErr) {
+            console.error("Profile creation error:", profileErr);
+          }
+
+          // 2. public.users 테이블 업서트 (user_id 기준 중복 키 위반 예방)
+          const { data: newUserRow, error: userErr } = await client
+            .from("users")
+            .upsert({
+              user_id: data.user.id,
+              login_email: email,
+              name: name,
+              last_login_time: new Date().toISOString()
+            }, { onConflict: "user_id" })
+            .select()
+            .single();
+
+          if (userErr) {
+            throw userErr;
+          }
+
+          const sessionData: UserSession = {
+            id: data.user.id,
+            email: email,
+            name: name,
+            userSeq: newUserRow?.user_seq ? Number(newUserRow.user_seq) : 1,
+            avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBCJRKcrw8jYy6nRr-YP0mvfcdQCZGulGdyzi2gnMfUv5adXdsvwJ-c6la6y17w3AVwz4CqHMb-ZOdjLMlclo8dS8bpakpQFAZ9V3DJZOctvzYBXd1rQF045DpAAel7e2tvMbOyA_iREPNt2Z0KfV9wRfJI6LpNzyocB3j3Zr2VyvTf6bHPZCwVk1J5MmxTf3rT476oiTNPeJV9KJ5atyNQRlm2I2gVLZU8rTcbp9flnrLAClH3tub8DCtmZGU2Ef9nAUcyb-PfuaU"
+          };
+
+          localStorage.setItem("tripmate_session", JSON.stringify(sessionData));
+          alert("성공적으로 회원가입이 완료되었습니다!");
+          onLoginSuccess(sessionData);
+        }
+      }
+    } catch (err: any) {
+      console.error("Auth submit logic error:", err);
+      setError(err.message || "인증 처리 중 알 수 없는 오류가 발생했습니다.");
     }
   };
 
-  const handleSocialClick = (platform: string) => {
-    // Elegant immediate auto login with platform name
+  const handleSocialClick = async (platform: string) => {
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        const { error: oauthErr } = await client.auth.signInWithOAuth({
+          provider: platform as any,
+          options: {
+            redirectTo: window.location.origin
+          }
+        });
+        if (oauthErr) throw oauthErr;
+      } catch (err: any) {
+        console.error("Social login redirect failed:", err);
+        alert(`소셜 로그인 시도 중 에러 발생: ${err.message}`);
+      }
+      return;
+    }
+
+    // Fallback Mock social logins
     const mockSession: UserSession = {
       id: `user-${platform}`,
       email: `${platform}@tripmate.ai`,
       name: platform === "google" ? "알렉스 리베라" : platform === "kakao" ? "카카오 멤버" : "네이버 멤버",
+      userSeq: 1,
       avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBCJRKcrw8jYy6nRr-YP0mvfcdQCZGulGdyzi2gnMfUv5adXdsvwJ-c6la6y17w3AVwz4CqHMb-ZOdjLMlclo8dS8bpakpQFAZ9V3DJZOctvzYBXd1rQF045DpAAel7e2tvMbOyA_iREPNt2Z0KfV9wRfJI6LpNzyocB3j3Zr2VyvTf6bHPZCwVk1J5MmxTf3rT476oiTNPeJV9KJ5atyNQRlm2I2gVLZU8rTcbp9flnrLAClH3tub8DCtmZGU2Ef9nAUcyb-PfuaU"
     };
     localStorage.setItem("tripmate_session", JSON.stringify(mockSession));

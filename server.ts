@@ -5,6 +5,7 @@
 
 import express from "express";
 import { createServer } from "http";
+import https from "https";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
@@ -12,6 +13,15 @@ import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// 비동기 예외로 인한 Node 프로세스 비정상 종료(crash) 방지 핸들러 추가
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[TripMate AI] Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[TripMate AI] Uncaught Exception thrown:", err);
+});
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -54,7 +64,7 @@ function writePlans(plans: any[]) {
 // Gemini AI API Utility
 // -------------------------------------------------------------
 let ai: GoogleGenAI | null = null;
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
 if (apiKey && apiKey !== "" && apiKey.trim() !== "") {
   try {
@@ -114,14 +124,22 @@ function getMockupImage(category: string, destination: string, index: number): s
   }
 
   // Fallbacks based on category
-  if (category === "맛집") {
+  if (category === "맛집" || category.includes("맛집")) {
     return "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop";
-  } else if (category === "카페") {
+  } else if (category === "카페" || category.includes("카페")) {
     return "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=500&auto=format&fit=crop";
-  } else if (category === "쇼핑") {
+  } else if (category === "쇼핑" || category.includes("쇼핑")) {
     return "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&auto=format&fit=crop";
-  } else if (category === "숙소") {
+  } else if (category === "숙소" || category.includes("숙소") || category.includes("호텔") || category.includes("펜션")) {
     return "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=500&auto=format&fit=crop";
+  } else if (category === "관광" || category === "명소" || category.includes("관광") || category.includes("명소") || category.includes("랜드마크") || category.includes("유적")) {
+    return "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500&auto=format&fit=crop";
+  } else if (category === "자연" || category.includes("자연") || category.includes("산") || category.includes("바다") || category.includes("공원") || category.includes("계곡")) {
+    return "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=500&auto=format&fit=crop";
+  } else if (category === "액티비티" || category === "체험" || category.includes("액티비티") || category.includes("체험") || category.includes("테마파크") || category.includes("레저")) {
+    return "https://images.unsplash.com/photo-1530521954074-e64f6810b32d?w=500&auto=format&fit=crop";
+  } else if (category === "힐링" || category === "문화" || category.includes("힐링") || category.includes("문화") || category.includes("미술관") || category.includes("박물관") || category.includes("전시")) {
+    return "https://images.unsplash.com/photo-1518156677180-95a2893f3e9f?w=500&auto=format&fit=crop";
   }
 
   return "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=500&auto=format&fit=crop";
@@ -263,7 +281,9 @@ app.post("/api/generate-plan", async (req, res) => {
             location: `${destination} 시내 중심가`,
             category: "관광",
             mustVisit: d === 1 && !!mustVisitPlaces,
-            tags: ["랜드마크", "아침산책", "인생샷"]
+            tags: ["랜드마크", "아침산책", "인생샷"],
+            latitude: d === 1 && mustVisitPlaces ? 36.3276 : 36.3504 + d * 0.005,
+            longitude: d === 1 && mustVisitPlaces ? 127.4272 : 127.3845 + d * 0.005
           },
           {
             time: "오후 12:30",
@@ -271,7 +291,9 @@ app.post("/api/generate-plan", async (req, res) => {
             description: "인근에서 가장 유명하고 후기가 극찬인 레스토랑에서 든든하게 점심 식사를 즐깁니다.",
             location: `${destination} 번화가`,
             category: "맛집",
-            tags: ["현지맛집", "미식탐방", "강력추천"]
+            tags: ["현지맛집", "미식탐방", "강력추천"],
+            latitude: 36.3504 + d * 0.005 - 0.002,
+            longitude: 127.3845 + d * 0.005 + 0.003
           },
           {
             time: "오후 02:30",
@@ -279,7 +301,9 @@ app.post("/api/generate-plan", async (req, res) => {
             description: "스타일리시한 인테리어와 수제 디저트가 일품인 핫플레이스 카페에서 차 한잔을 기울이며 휴식을 누립니다.",
             location: `${destination} 골목 정취`,
             category: "카페",
-            tags: ["감성카페", "수제디저트", "힐링"]
+            tags: ["감성카페", "수제디저트", "힐링"],
+            latitude: 36.3504 + d * 0.005 + 0.004,
+            longitude: 127.3845 + d * 0.005 - 0.002
           },
           {
             time: "오후 05:00",
@@ -287,7 +311,9 @@ app.post("/api/generate-plan", async (req, res) => {
             description: "로컬 소품과 한정판 기념품을 만나볼 수 있는 개성 넘치는 거리를 구경하며 지인들 선물을 마련합니다.",
             location: `${destination} 쇼핑 에비뉴`,
             category: "쇼핑",
-            tags: ["쇼핑", "기념품", "거리탐방"]
+            tags: ["쇼핑", "기념품", "거리탐방"],
+            latitude: 36.3504 + d * 0.005 - 0.003,
+            longitude: 127.3845 + d * 0.005 + 0.001
           }
         ]
       });
@@ -330,12 +356,14 @@ app.post("/api/generate-plan", async (req, res) => {
 2. 맛집이나 카페 스타일을 선호하는 경우 점심/저녁 식사 시간대에 어울리는 식당이나 명소를 동선 상에 스마트하게 배치하세요.
 3. 요청한 필수 방문 장소([Must-Visit])가 있다면, 일치하는 활동에서  "mustVisit": true 로 설정하고 실제 여행 일정에 반드시 포함하세요.
 4. 설명은 여행 가이드북처럼 구체적이고 현지 감성을 살려 팁과 정겨운 톤("~를 강력 추천합니다", "~를 만끽해보세요" 처럼 존댓말 한글)으로 작성해주세요.
+5. 모든 장소 활동(activities)에 대해 지도로 표현하고 이동 선을 그릴 수 있도록 실제 위도(latitude)와 경도(longitude) 값(실수형 숫자 형태)을 유추하여 반드시 포함시켜주세요. (예: 대전 성심당 본점인 경우 36.3276, 127.4272)
 
 반드시 명시된 JSON 스키마를 준수하여 응답해 주세요.`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+  const generateWithModel = async (modelName: string) => {
+    if (!ai) throw new Error("AI client not initialized");
+    return await ai.models.generateContent({
+      model: modelName,
       contents: prompt,
       config: {
         systemInstruction: "당신은 항상 정확한 JSON 데이터를 출력하는 여행 도우미입니다. 한국어로 응답하세요.",
@@ -359,13 +387,15 @@ app.post("/api/generate-plan", async (req, res) => {
                     location: { type: Type.STRING, description: "그 장소의 추천 랜드마크 지역 혹은 도로명" },
                     category: { type: Type.STRING, description: "활동 유형 (관광, 맛집, 카페, 쇼핑, 숙소, 이동 중 하나를 매칭)" },
                     mustVisit: { type: Type.BOOLEAN, description: "사용자가 필수 지목한 가고싶은 곳인 경우 true, 아니면 false" },
+                    latitude: { type: Type.NUMBER, description: "해당 장소의 위도 좌표 실수형 데이터 (예: 36.3276)" },
+                    longitude: { type: Type.NUMBER, description: "해당 장소의 경도 좌표 실수형 데이터 (예: 127.4272)" },
                     tags: {
                       type: Type.ARRAY,
                       items: { type: Type.STRING },
                       description: "연관된 해시태그 목록 2-3개 (예: ['인생샷', '전위예술', '오션뷰'])"
                     }
                   },
-                  required: ["time", "title", "description", "location", "category"]
+                  required: ["time", "title", "description", "location", "category", "latitude", "longitude"]
                 }
               }
             },
@@ -374,11 +404,43 @@ app.post("/api/generate-plan", async (req, res) => {
         }
       }
     });
+  };
+
+  // 비동기 대기를 위한 헬퍼 함수 정의
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  try {
+    let response;
+    try {
+      console.log("Attempting generation with primary model: gemini-2.5-flash...");
+      response = await generateWithModel("gemini-2.5-flash");
+    } catch (primaryErr: any) {
+      console.warn(`[TripMate AI] Primary model (gemini-2.5-flash) failed: ${primaryErr.message || primaryErr}`);
+      console.log("Waiting 1.5 seconds to bypass temporary API traffic spikes...");
+
+      // 1.5초 대기 후 백업 모델로 시도하여 구글 측 일시적 503 부하 우회
+      await sleep(1500);
+
+      try {
+        console.log("Retrying with backup model: gemini-2.5-flash-lite...");
+        response = await generateWithModel("gemini-2.5-flash-lite");
+      } catch (backupErr: any) {
+        console.warn(`[TripMate AI] Backup model (gemini-2.5-flash-lite) also failed. Trying gemini-2.5-flash one last time...`);
+        await sleep(1000);
+        response = await generateWithModel("gemini-2.5-flash");
+      }
+    }
 
     const responseText = response.text;
     if (!responseText) {
       throw new Error("Empty response text from Gemini API");
     }
+
+    // Gemini API 응답 원본을 개발자 콘솔(터미널)에 출력
+    console.log("==================================================");
+    console.log("★ [TripMate AI] Gemini API 수신 원본 텍스트 데이터:");
+    console.log(responseText);
+    console.log("==================================================");
 
     const cleanedText = responseText.trim();
     const daysContent = JSON.parse(cleanedText);
@@ -414,6 +476,78 @@ app.post("/api/generate-plan", async (req, res) => {
     // Graceful fallback so the app experience is resilient and doesn't load infinitely
     const fallback = createFallbackPlan();
     return res.json(fallback);
+  }
+});
+
+// -------------------------------------------------------------
+// 6. Geocoding Proxy API to bypass browser CORS & 429 limit
+// -------------------------------------------------------------
+const serverGeocodeCache: { [key: string]: { lat: number; lon: number } } = {};
+
+function fetchCoordinatesFromOSM(searchQuery: string): Promise<{ lat: number; lon: number } | null> {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`;
+  
+  return new Promise((resolve, reject) => {
+    const options = {
+      headers: {
+        "User-Agent": "TripMateAI/1.0 (contact: support@tripmate.ai)"
+      }
+    };
+
+    https.get(url, options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => {
+        data += chunk;
+      });
+
+      res.on("end", () => {
+        try {
+          if (res.statusCode === 200) {
+            const parsed = JSON.parse(data);
+            if (parsed && parsed.length > 0) {
+              resolve({
+                lat: parseFloat(parsed[0].lat),
+                lon: parseFloat(parsed[0].lon)
+              });
+              return;
+            }
+          }
+          resolve(null);
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    }).on("error", (err) => {
+      reject(err);
+    });
+  });
+}
+
+app.get("/api/geocode", async (req, res) => {
+  const { query, city } = req.query;
+  if (!query) {
+    return res.status(400).json({ error: "query parameter is required" });
+  }
+
+  const dest = (city as string) || "";
+  const searchKey = `${dest}_${query}`;
+
+  if (serverGeocodeCache[searchKey]) {
+    return res.json(serverGeocodeCache[searchKey]);
+  }
+
+  try {
+    const searchQuery = (query as string).includes(dest) ? (query as string) : `${dest} ${query}`;
+    const coord = await fetchCoordinatesFromOSM(searchQuery);
+    
+    if (coord) {
+      serverGeocodeCache[searchKey] = coord;
+      return res.json(coord);
+    }
+    return res.status(404).json({ error: "No location found" });
+  } catch (err: any) {
+    console.error("Server geocoding error:", err);
+    return res.status(500).json({ error: err.message || "Internal server error" });
   }
 });
 

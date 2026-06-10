@@ -19,6 +19,7 @@ import {
   getSupabaseClient,
   mapFromSupabase,
   mapToSupabase,
+  mapToSupabaseItem,
 } from "./lib/supabaseClient";
 
 export default function App() {
@@ -53,16 +54,17 @@ export default function App() {
       try {
         const client = getSupabaseClient();
         if (client) {
+          // travel_plans와 하위 travel_items를 조인 쿼리해 옵니다 (user_seq 기준)
           const { data, error } = await client
             .from("travel_plans")
-            .select("*")
-            .eq("user_id", currentSession.id)
+            .select("*, travel_items(*)")
+            .eq("user_seq", currentSession.userSeq || 1)
             .order("created_at", { ascending: false });
 
           if (error) throw error;
           if (data) {
             setSavedPlans(data.map(mapFromSupabase));
-            console.log("Plans sync-loaded from Supabase Cloud.");
+            console.log("Plans sync-loaded from Supabase Cloud with relational items.");
             return;
           }
         }
@@ -106,10 +108,19 @@ export default function App() {
     setActivePlan(null);
   };
 
-  // 1. Create Travel Plan
-  const handlePlanGenerated = (plan: TravelPlan) => {
-    // Fill required details if server returns minimal template
-    plan.userId = session?.id || "user-123";
+  // 1. Create Travel Plan (일정 생성 즉시 데이터베이스 자동 저장 연동)
+  const handlePlanGenerated = async (plan: TravelPlan) => {
+    if (session) {
+      plan.userId = session.id;
+      plan.userSeq = session.userSeq || 1;
+      
+      // 생성 완료 시 즉각 Supabase DB에 인서트 트랜잭션 수행
+      await handleSaveToMyPage(plan);
+    } else {
+      plan.userId = "user-123";
+    }
+
+    // DB 자동 저장 완료 후 생성된 플랜 결과를 화면에 즉시 바인딩 및 노출시킵니다.
     setActivePlan(plan);
     setActiveTab("plan_result");
   };
@@ -121,6 +132,7 @@ export default function App() {
     const completePlan = {
       ...plan,
       userId: session.id,
+      userSeq: session.userSeq || 1,
       createdAt: plan.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -131,12 +143,45 @@ export default function App() {
         const client = getSupabaseClient();
         if (client) {
           const payload = mapToSupabase(completePlan);
-          const { error } = await client.from("travel_plans").insert(payload);
-          if (error) throw error;
+          
+          // 1단계: travel_plans 마스터 삽입 및 자동 생성된 id 획득
+          const { data: insertedPlan, error: planErr } = await client
+            .from("travel_plans")
+            .insert(payload)
+            .select()
+            .single();
 
-          setSavedPlans([completePlan, ...savedPlans]);
-          alert("성공적으로 Supabase 클라우드 데이터베이스에 일정이 저장되었습니다!");
-          setActiveTab("my_trips");
+          if (planErr) throw planErr;
+
+          // 2단계: 일차별 활동 목록을 travel_items 컬럼 규격에 맞춰 다중 삽입(Bulk Insert)
+          const itemsPayload: any[] = [];
+          completePlan.planContent.forEach((dayObj) => {
+            if (Array.isArray(dayObj.activities)) {
+              dayObj.activities.forEach((act, idx) => {
+                itemsPayload.push(mapToSupabaseItem(act, insertedPlan.id, dayObj.day, idx));
+              });
+            }
+          });
+
+          if (itemsPayload.length > 0) {
+            const { error: itemsErr } = await client
+              .from("travel_items")
+              .insert(itemsPayload);
+              
+            if (itemsErr) {
+              // 아이템 삽입 실패 시 데이터 정합성을 위해 마스터 레코드 롤백 삭제
+              await client.from("travel_plans").delete().eq("id", insertedPlan.id);
+              throw itemsErr;
+            }
+          }
+
+          const finalPlanData = {
+            ...completePlan,
+            id: insertedPlan.id
+          };
+
+          setSavedPlans([finalPlanData, ...savedPlans]);
+          // 저장 후 강제 탭 이동 및 얼럿 팝업을 제거하여 생성 결과를 즉시 노출하도록 보장합니다.
           return;
         }
       } catch (err: any) {
@@ -179,15 +224,42 @@ export default function App() {
         const client = getSupabaseClient();
         if (client) {
           const payload = mapToSupabase(updatedPlan);
-          const { error } = await client
+          
+          // 1단계: travel_plans 마스터 정보 갱신
+          const { error: masterErr } = await client
             .from("travel_plans")
             .update(payload)
             .eq("id", plan.id);
 
-          if (error) throw error;
+          if (masterErr) throw masterErr;
+
+          // 2단계: 기존 travel_items 삭제 후 갱신된 내역으로 다시 인서트 (Delete & Insert 전략)
+          const { error: delErr } = await client
+            .from("travel_items")
+            .delete()
+            .eq("plan_id", plan.id);
+            
+          if (delErr) throw delErr;
+
+          const itemsPayload: any[] = [];
+          updatedPlan.planContent.forEach((dayObj) => {
+            if (Array.isArray(dayObj.activities)) {
+              dayObj.activities.forEach((act, idx) => {
+                itemsPayload.push(mapToSupabaseItem(act, plan.id, dayObj.day, idx));
+              });
+            }
+          });
+
+          if (itemsPayload.length > 0) {
+            const { error: insErr } = await client
+              .from("travel_items")
+              .insert(itemsPayload);
+              
+            if (insErr) throw insErr;
+          }
 
           setSavedPlans(savedPlans.map((p) => (p.id === plan.id ? updatedPlan : p)));
-          console.log("Updated plan in Supabase successfully.");
+          console.log("Updated plan in Supabase relational tables successfully.");
           return;
         }
       } catch (err) {
@@ -221,24 +293,33 @@ export default function App() {
       try {
         const client = getSupabaseClient();
         if (client) {
-          const { error } = await client
+          // 외래키 무결성을 보장하기 위해 하위 travel_items 코스를 선행 삭제합니다.
+          const { error: itemsDelErr } = await client
+            .from("travel_items")
+            .delete()
+            .eq("plan_id", id);
+
+          if (itemsDelErr) throw itemsDelErr;
+
+          // 마스터 travel_plans 삭제 실행
+          const { error: planDelErr } = await client
             .from("travel_plans")
             .delete()
             .eq("id", id);
 
-          if (error) throw error;
+          if (planDelErr) throw planDelErr;
 
           setSavedPlans(savedPlans.filter((p) => p.id !== id));
           if (activePlan?.id === id) {
             setActivePlan(null);
             setActiveTab("my_trips");
           }
-          console.log("Deleted plan in Supabase successfully.");
+          console.log("Deleted plan in Supabase relational tables successfully.");
           return;
         }
       } catch (err: any) {
         console.error("Failed to delete in Supabase. Falling back to local.", err);
-        alert(`Supabase 삭제 문제 (${err.message}). 로컬 백업에서 직접 지우기를 진행합니다.`);
+        alert(`Supabase 삭제 문제 (${err.message || err}). 로컬 백업에서 직접 지우기를 진행합니다.`);
       }
     }
 

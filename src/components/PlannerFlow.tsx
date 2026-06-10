@@ -15,21 +15,21 @@ export default function PlannerFlow({ onPlanGenerated }: PlannerFlowProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // Form Fields
-  const [tripTitle, setTripTitle] = useState("");
-  const [destination, setDestination] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  // Form Fields (테스트용 기본값 설정)
+  const [tripTitle, setTripTitle] = useState("대전으로 떠나는 먹방 여행");
+  const [destination, setDestination] = useState("대전");
+  const [startDate, setStartDate] = useState("2026-06-10");
+  const [endDate, setEndDate] = useState("2026-06-12");
   const [companion, setCompanion] = useState("혼자");
   
   // Preference styles (multiple select)
   const [styles, setStyles] = useState<string[]>(["맛집", "자연"]);
   const [tagInput, setTagInput] = useState("");
-  const [mustVisitPlaces, setMustVisitPlaces] = useState<string[]>([]);
+  const [mustVisitPlaces, setMustVisitPlaces] = useState<string[]>(["성심당", "한밭수목원"]);
   const [budget, setBudget] = useState("표준형");
 
   // Extra details
-  const [comments, setComments] = useState("");
+  const [comments, setComments] = useState("넉넉한 여행 스케쥴");
 
   const companions = [
     { label: "혼자", icon: "person" },
